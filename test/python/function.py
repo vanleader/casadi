@@ -477,7 +477,7 @@ class Functiontests(casadiTestCase):
     Z = [MX.sym("z",2,2) for i in range(n)]
     V = [MX.sym("z",Sparsity.upper(3)) for i in range(n)]
 
-    for parallelization in ["serial","openmp","unroll","inline"] if args.run_slow else ["serial"]:
+    for parallelization in ["serial","openmp","unroll","inline","thread"] if args.run_slow else ["serial"]:
         print(parallelization)
         res = fun.map(n, parallelization).call([horzcat(*x) for x in [X,Y,Z,V]])
 
@@ -520,7 +520,7 @@ class Functiontests(casadiTestCase):
     zi = 0
     for Z_alt in [Z,[MX()]*3]:
       zi+= 1
-      for parallelization in ["serial","openmp","unroll"]:
+      for parallelization in ["serial","openmp","unroll","thread"]:
         res = fun.mapsum([horzcat(*x) for x in [X,Y,Z_alt,V]],parallelization) # Joris - clean alternative for this?
 
         for ad_weight_sp in [0,1]:
@@ -541,7 +541,8 @@ class Functiontests(casadiTestCase):
 
           inputs = X_+Y_+Z_+V_
 
-          self.check_codegen(F,inputs=inputs)
+          if parallelization!="thread":
+            self.check_codegen(F,inputs=inputs)
 
           for f in [F,toSX_fun(F)]:
             self.checkfunction(f,Fref,inputs=inputs,sparsity_mod=args.run_slow)
@@ -565,7 +566,7 @@ class Functiontests(casadiTestCase):
 
     for Z_alt in [Z]:
 
-      for parallelization in ["serial","openmp","unroll"]:
+      for parallelization in ["serial","openmp","unroll","thread"]:
 
         for ad_weight_sp in [0,1]:
           for ad_weight in [0,1]:
@@ -591,7 +592,8 @@ class Functiontests(casadiTestCase):
 
             inputs = [horzcat(*X_),horzcat(*Y_),Z_,V_]
 
-            self.check_codegen(F,inputs=inputs)
+            if parallelization!="thread":
+              self.check_codegen(F,inputs=inputs)
 
             for f in [F,toSX_fun(F)]:
               self.checkfunction(f,Fref,inputs=inputs,sparsity_mod=args.run_slow)
@@ -1682,6 +1684,7 @@ class Functiontests(casadiTestCase):
 
     f = Function('f',[x,y],[x**2,x*y],["x","y"],["w","z"])
     self.assertTrue("(x,y)->(w,z)" in str(f))
+
 
 if __name__ == '__main__':
     unittest.main()

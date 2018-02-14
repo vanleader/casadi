@@ -108,6 +108,7 @@ else()
   message(FATAL_ERROR "Cannot enable C++11 features.")
 endif()
 
+
 if(CXX11FLAG)
   try_compile(HAS_COPYSIGN
     ${CMAKE_BINARY_DIR}
@@ -230,6 +231,13 @@ if(WITH_OPENMP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -DWITH_OPENMP")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS} -DWITH_OPENMP")
   endif()
+endif()
+
+# enabling Threads support if requested
+option(WITH_THREAD "Compile with parallelization support" OFF)
+if(WITH_THREAD)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+  add_definitions(-DWITH_THREAD)
 endif()
 
 # OpenCL

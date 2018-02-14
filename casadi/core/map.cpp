@@ -25,6 +25,10 @@
 
 #include "map.hpp"
 
+#ifdef WITH_THREAD
+#include <thread>
+#endif
+
 using namespace std;
 
 namespace casadi {
@@ -36,6 +40,8 @@ namespace casadi {
       return Function::create(new Map(name, f, n), Dict());
     } else if (parallelization== "openmp") {
       return Function::create(new MapOmp(name, f, n), Dict());
+    } else if (parallelization== "thread") {
+      return Function::create(new MapThreads(name, f, n), Dict());
     } else {
       casadi_error("Unknown parallelization: " + parallelization);
     }
@@ -305,6 +311,81 @@ namespace casadi {
   }
 
   void MapOmp::init(const Dict& opts) {
+    // Call the initialization method of the base class
+    Map::init(opts);
+
+    // Allocate memory for holding memory object references
+    alloc_iw(n_, true);
+
+    // Allocate sufficient memory for parallel evaluation
+    alloc_arg(f_.sz_arg() * n_);
+    alloc_res(f_.sz_res() * n_);
+    alloc_w(f_.sz_w() * n_);
+    alloc_iw(f_.sz_iw() * n_);
+  }
+
+
+  MapThreads::~MapThreads() {
+  }
+
+  void ThreadsWork(const Function& f, const double** arg, double** res, casadi_int* iw, double* w,
+      casadi_int ind, int& ret) {
+    ret = f(arg, res, iw, w, ind);
+  }
+
+  int MapThreads::eval(const double** arg, double** res, casadi_int* iw, double* w,
+      void* mem) const {
+
+#ifndef WITH_THREAD
+    return Map::eval(arg, res, iw, w, mem);
+#else // WITH_THREAD
+    std::vector<std::thread> threads;
+
+    size_t sz_arg, sz_res, sz_iw, sz_w;
+    f_.sz_work(sz_arg, sz_res, sz_iw, sz_w);
+
+    // Checkout memory objects
+    casadi_int* ind = iw; iw += n_;
+    for (casadi_int i=0; i<n_; ++i) ind[i] = f_.checkout();
+
+    std::vector<int> ret_values(n_);
+
+    for (casadi_int i=0; i<n_; ++i) {
+      // Input buffers
+      const double** arg1 = arg + n_in_ + i*sz_arg;
+      for (casadi_int j=0; j<n_in_; ++j) {
+        arg1[j] = arg[j] ? arg[j] + i*f_.nnz_in(j) : 0;
+      }
+
+      // Output buffers
+      double** res1 = res + n_out_ + i*sz_res;
+      for (casadi_int j=0; j<n_out_; ++j) {
+        res1[j] = res[j] ? res[j] + i*f_.nnz_out(j) : 0;
+      }
+
+      threads.push_back(std::thread(ThreadsWork,
+          f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i])));
+    }
+
+    for (auto && e : threads) e.join();
+
+    // Release memory objects
+    for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
+
+    for (int e : ret_values) {
+      if (!e) return e;
+    }
+
+    // Return success
+    return 0;
+#endif // WITH_THREAD
+  }
+
+  void MapThreads::codegen_body(CodeGenerator& g) const {
+    casadi_error("not implemented");
+  }
+
+  void MapThreads::init(const Dict& opts) {
     // Call the initialization method of the base class
     Map::init(opts);
 
