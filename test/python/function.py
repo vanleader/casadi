@@ -501,6 +501,44 @@ class Functiontests(casadiTestCase):
 
           self.checkfunction(f,Fref,inputs=X_+Y_+Z_+V_,sparsity_mod=args.run_slow)
 
+  def test_map_node_light(self):
+    x = SX.sym("x")
+    y = SX.sym("y",2)
+    z = SX.sym("z",2,2)
+    v = SX.sym("z",Sparsity.upper(3))
+
+    fun = Function("f",[x,y,z,v],[mtimes(z,y)+x,sin(y*x).T,v/x])
+
+    n = 2
+
+    X = [MX.sym("x") for i in range(n)]
+    Y = [MX.sym("y",2) for i in range(n)]
+    Z = [MX.sym("z",2,2) for i in range(n)]
+    V = [MX.sym("z",Sparsity.upper(3)) for i in range(n)]
+
+    for parallelization in ["serial","openmp","unroll","inline","thread"]:
+        print(parallelization)
+        res = fun.map(n, parallelization).call([horzcat(*x) for x in [X,Y,Z,V]])
+
+
+        F = Function("F",X+Y+Z+V,list(map(sin,res)))
+
+        resref = [[] for i in range(fun.n_out())]
+        for r in zip(X,Y,Z,V):
+          for i,e in enumerate(map(sin,fun.call(r))):
+            resref[i] = resref[i] + [e]
+
+        Fref = Function("F",X+Y+Z+V,[horzcat(*x) for x in resref])
+
+        np.random.seed(0)
+        X_ = [ DM(i.sparsity(),np.random.random(i.nnz())) for i in X ]
+        Y_ = [ DM(i.sparsity(),np.random.random(i.nnz())) for i in Y ]
+        Z_ = [ DM(i.sparsity(),np.random.random(i.nnz())) for i in Z ]
+        V_ = [ DM(i.sparsity(),np.random.random(i.nnz())) for i in V ]
+
+        for f in [F, F.expand('expand_'+F.name())]:
+          self.checkfunction_light(f,Fref,inputs=X_+Y_+Z_+V_,)
+
   @memory_heavy()
   def test_mapsum(self):
     x = SX.sym("x")

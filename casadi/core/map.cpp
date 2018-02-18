@@ -348,6 +348,7 @@ namespace casadi {
     casadi_int* ind = iw; iw += n_;
     for (casadi_int i=0; i<n_; ++i) ind[i] = f_.checkout();
 
+    // Allocate space for return values
     std::vector<int> ret_values(n_);
 
     for (casadi_int i=0; i<n_; ++i) {
@@ -363,15 +364,18 @@ namespace casadi {
         res1[j] = res[j] ? res[j] + i*f_.nnz_out(j) : 0;
       }
 
+      // Spawn thread
       threads.push_back(std::thread(ThreadsWork,
           f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i])));
     }
 
+    // Join threads
     for (auto && e : threads) e.join();
 
     // Release memory objects
     for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
 
+    // Compute aggregate return value
     for (int e : ret_values) {
       if (!e) return e;
     }
