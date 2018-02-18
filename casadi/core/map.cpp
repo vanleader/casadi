@@ -26,8 +26,12 @@
 #include "map.hpp"
 
 #ifdef WITH_THREAD
+#ifdef WITH_THREAD_MINGW
+#include <mingw.thread>
+#else // WITH_THREAD_MINGW
 #include <thread>
-#endif
+#endif // WITH_THREAD_MINGW
+#endif // WITH_THREAD
 
 using namespace std;
 
