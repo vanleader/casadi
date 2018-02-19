@@ -334,7 +334,9 @@ namespace casadi {
 
   void ThreadsWork(const Function& f, const double** arg, double** res, casadi_int* iw, double* w,
       casadi_int ind, int& ret) {
-    uout () << "Thread started " << arg << ":" << res << ":" << iw << ":" << w << ":" << ind << std::endl;
+    std::stringstream ss;
+    ss << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]";
+    uout () << "Thread started " << ss.str() << std::endl;
     ret = f(arg, res, iw, w, ind);
     uout () << "Thread ended" << std::endl;
   }
