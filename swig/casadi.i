@@ -943,8 +943,9 @@ namespace std {
     GUESTOBJECT * from_ptr(const casadi_int *a) {
 #ifdef SWIGPYTHON
       // For python on Windows
-      if (*a > std::numeric_limits<int>::max() || *a < std::numeric_limits<int>::min()) PyLong_FromLongLong(*a);
-      return PyInt_FromLong(*a);
+      //if (*a > std::numeric_limits<int>::max() || *a < std::numeric_limits<int>::min()) PyLong_FromLongLong(*a);
+      //return PyInt_FromLong(*a);
+      return PyLong_FromLongLong(*a);
 #elif defined(SWIGMATLAB)
       return mxCreateDoubleScalar(static_cast<double>(*a));
 #else
