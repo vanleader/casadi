@@ -334,7 +334,9 @@ namespace casadi {
 
   void ThreadsWork(const Function& f, const double** arg, double** res, casadi_int* iw, double* w,
       casadi_int ind, int& ret) {
+    uout () << "Thread started " << arg << ":" << res << ":" << iw << ":" << w << ":" << ind << std::endl;
     ret = f(arg, res, iw, w, ind);
+    uout () << "Thread ended" << std::endl;
   }
 
   int MapThreads::eval(const double** arg, double** res, casadi_int* iw, double* w,
@@ -373,8 +375,10 @@ namespace casadi {
           f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i])));
     }
 
+    uout () << "Before joins" << std::endl;
     // Join threads
     for (auto && e : threads) e.join();
+    uout () << "After joins" << std::endl;
 
     // Release memory objects
     for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
