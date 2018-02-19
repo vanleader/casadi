@@ -335,10 +335,14 @@ namespace casadi {
   void ThreadsWork(const Function& f, const double** arg, double** res, casadi_int* iw, double* w,
       casadi_int ind, int& ret) {
     std::stringstream ss;
-    ss << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]";
+    ss << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]: ";
+    ss << std::vector<double>(w, w+1);
     uout () << "Thread started " << ss.str() << std::endl;
     ret = f(arg, res, iw, w, ind);
-    uout () << "Thread ended" << std::endl;
+    std::stringstream ss1;
+    ss1 << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]: ";
+    ss1 << std::vector<double>(w, w+1);
+    uout () << "Thread ended " << ss1.str() << std::endl;
   }
 
   int MapThreads::eval(const double** arg, double** res, casadi_int* iw, double* w,
