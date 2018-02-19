@@ -27,7 +27,7 @@
 
 #ifdef WITH_THREAD
 #ifdef WITH_THREAD_MINGW
-#include <mingw.thread>
+#include "mingw.thread.h"
 #else // WITH_THREAD_MINGW
 #include <thread>
 #endif // WITH_THREAD_MINGW
