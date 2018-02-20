@@ -383,8 +383,8 @@ namespace casadi {
       uout() << "Spawning with " << ss.str() << std::endl;
 
       // Spawn thread
-      threads.push_back(std::thread(ThreadsWork,
-          f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i])));
+      threads.emplace_back(ThreadsWork,
+          f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i]));
     }
 
     uout() << "Before joins" << std::endl;
@@ -406,7 +406,43 @@ namespace casadi {
   }
 
   void MapThreads::codegen_body(CodeGenerator& g) const {
-    casadi_error("not implemented");
+    g.add_include("threads.h");
+    size_t sz_arg, sz_res, sz_iw, sz_w;
+    f_.sz_work(sz_arg, sz_res, sz_iw, sz_w);
+    /**struct casadi_eval_arg {
+      const double ** arg;
+      double ** res;
+      casadi_int * iw;
+      double * w;
+    };
+    int (void *arg) {
+      casadi_eval_arg* r = (casadi_eval_arg*) arg;
+      (r.arg, r.res, r.iw, r.w);
+    }*/
+    g << "casadi_int i;\n"
+      << "const double** arg1;\n"
+      << "double** res1;\n"
+      << "casadi_int flag = 0;\n"
+      << "thrd_t thread[" << n_ << "];\n"
+      << "for (i=0; i<" << n_ << "; ++i) {\n"
+      << "arg1 = arg + " << n_in_ << "+i*" << sz_arg << ";\n";
+    for (casadi_int j=0; j<n_in_; ++j) {
+      g << "arg1[" << j << "] = arg[" << j << "] ? "
+        << "arg[" << j << "]+i*" << f_.nnz_in(j) << ": 0;\n";
+    }
+    g << "res1 = res + " <<  n_out_ << "+i*" <<  sz_res << ";\n";
+    for (casadi_int j=0; j<n_out_; ++j) {
+      g << "res1[" << j << "] = res[" << j << "] ?"
+        << "res[" << j << "]+i*" << f_.nnz_out(j) << ": 0;\n";
+    }\
+    g << "casadi_eval_arg r = { .arg = arg1, .res = res1, .iw = iw+" << n_ << "+i*" << sz_iw << ", .w = w+i*" << sz_w << "};\n";
+    g << "thrd_create(&thread[i], (void *) r);\n"
+      << "}\n"
+      << "for (i=0; i<" << n_ << "; ++i) {\n"
+      << "  thrd_join(&thread[i], iw+" << n_ << ");\n"
+      << "  flag = flag || *(iw+" << n_ << ");\n"
+      << "}\n"
+      << "return flag;\n";
   }
 
   void MapThreads::init(const Dict& opts) {
