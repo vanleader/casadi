@@ -356,6 +356,8 @@ namespace casadi {
     size_t sz_arg, sz_res, sz_iw, sz_w;
     f_.sz_work(sz_arg, sz_res, sz_iw, sz_w);
 
+    uout() << "Sizes " << sz_w << ":" << sz_iw << std::endl;
+
     // Checkout memory objects
     casadi_int* ind = iw; iw += n_;
     for (casadi_int i=0; i<n_; ++i) ind[i] = f_.checkout();
@@ -376,15 +378,19 @@ namespace casadi {
         res1[j] = res[j] ? res[j] + i*f_.nnz_out(j) : 0;
       }
 
+      std::stringstream ss;
+      ss << "[" << arg1 << ":" << res1 << ":" << iw + i*sz_iw << ":" << w + i*sz_w << ":"  << ind[i] << "]: ";
+      uout() << "Spawning with " << ss.str() << std::endl;
+
       // Spawn thread
       threads.push_back(std::thread(ThreadsWork,
           f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i])));
     }
 
-    uout () << "Before joins" << std::endl;
+    uout() << "Before joins" << std::endl;
     // Join threads
     for (auto && e : threads) e.join();
-    uout () << "After joins" << std::endl;
+    uout() << "After joins" << std::endl;
 
     // Release memory objects
     for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
