@@ -379,22 +379,23 @@ namespace casadi {
     // Spawn threads
     std::vector<std::thread> threads;
     for (casadi_int i=0; i<n_; ++i) {
-      threads.emplace_back(ThreadsWork, f_, i, i+1, arg, res, iw, w, ind[i], std::ref(ret_values[i]));
+      //threads.emplace_back(ThreadsWork, f_, i, i+1, arg, res, iw, w, ind[i], std::ref(ret_values[i]));
+      threads.emplace_back([i](const Function& f, const double** arg, double** res, casadi_int* iw, double* w, casadi_int ind, int& ret) { ThreadsWork(f, i, i+1, arg, res, iw, w, ind, ret); }, f_, arg, res, iw, w, ind[i], std::ref(ret_values[i]));
     }
 
     // Join threads
-    for (auto && e : threads) e.join();
+    for (auto && th : threads) th.join();
 
     // Release memory objects
     for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
 
-    // Compute aggregate return value
-    for (int e : ret_values) {
-      if (!e) return e;
-    }
+    // Anticipate success
+    int ret = 0;
 
-    // Return success
-    return 0;
+    // Compute aggregate return value
+    for (int e : ret_values) ret = ret || e;
+
+    return ret;
 #endif // WITH_THREAD
   }
 
