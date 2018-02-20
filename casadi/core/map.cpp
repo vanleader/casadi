@@ -332,17 +332,35 @@ namespace casadi {
   MapThreads::~MapThreads() {
   }
 
-  void ThreadsWork(const Function& f, const double** arg, double** res, casadi_int* iw, double* w,
+  void ThreadsWork(const Function& f, casadi_int start, casadi_int stop,
+      const double** arg, double** res,
+      casadi_int* iw, double* w,
       casadi_int ind, int& ret) {
-    std::stringstream ss;
-    ss << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]: ";
-    ss << std::vector<double>(w, w+1);
-    uout () << "Thread started " << ss.str() << std::endl;
-    ret = f(arg, res, iw, w, ind);
-    std::stringstream ss1;
-    ss1 << "[" << arg << ":" << res << ":" << iw << ":" << w << ":"  << ind << "]: ";
-    ss1 << std::vector<double>(w, w+1);
-    uout () << "Thread ended " << ss1.str() << std::endl;
+
+    // Function dimensions
+    casadi_int n_in = f.n_in();
+    casadi_int n_out = f.n_out();
+
+    // Function work sizes
+    size_t sz_arg, sz_res, sz_iw, sz_w;
+    f.sz_work(sz_arg, sz_res, sz_iw, sz_w);
+
+    ret = 0;
+    for (casadi_int i=start; i<stop; ++i) {
+      // Input buffers
+      const double** arg1 = arg + n_in + i*sz_arg;
+      for (casadi_int j=0; j<n_in; ++j) {
+        arg1[j] = arg[j] ? arg[j] + i*f.nnz_in(j) : 0;
+      }
+
+      // Output buffers
+      double** res1 = res + n_out + i*sz_res;
+      for (casadi_int j=0; j<n_out; ++j) {
+        res1[j] = res[j] ? res[j] + i*f.nnz_out(j) : 0;
+      }
+
+      ret = ret || f(arg1, res1, iw + i*sz_iw, w + i*sz_w, ind);
+    }
   }
 
   int MapThreads::eval(const double** arg, double** res, casadi_int* iw, double* w,
@@ -351,13 +369,6 @@ namespace casadi {
 #ifndef WITH_THREAD
     return Map::eval(arg, res, iw, w, mem);
 #else // WITH_THREAD
-    std::vector<std::thread> threads;
-
-    size_t sz_arg, sz_res, sz_iw, sz_w;
-    f_.sz_work(sz_arg, sz_res, sz_iw, sz_w);
-
-    uout() << "Sizes " << sz_w << ":" << sz_iw << std::endl;
-
     // Checkout memory objects
     casadi_int* ind = iw; iw += n_;
     for (casadi_int i=0; i<n_; ++i) ind[i] = f_.checkout();
@@ -365,32 +376,14 @@ namespace casadi {
     // Allocate space for return values
     std::vector<int> ret_values(n_);
 
+    // Spawn threads
+    std::vector<std::thread> threads;
     for (casadi_int i=0; i<n_; ++i) {
-      // Input buffers
-      const double** arg1 = arg + n_in_ + i*sz_arg;
-      for (casadi_int j=0; j<n_in_; ++j) {
-        arg1[j] = arg[j] ? arg[j] + i*f_.nnz_in(j) : 0;
-      }
-
-      // Output buffers
-      double** res1 = res + n_out_ + i*sz_res;
-      for (casadi_int j=0; j<n_out_; ++j) {
-        res1[j] = res[j] ? res[j] + i*f_.nnz_out(j) : 0;
-      }
-
-      std::stringstream ss;
-      ss << "[" << arg1 << ":" << res1 << ":" << iw + i*sz_iw << ":" << w + i*sz_w << ":"  << ind[i] << "]: ";
-      uout() << "Spawning with " << ss.str() << std::endl;
-
-      // Spawn thread
-      threads.emplace_back(ThreadsWork,
-          f_, arg1, res1, iw + i*sz_iw, w + i*sz_w, ind[i],  std::ref(ret_values[i]));
+      threads.emplace_back(ThreadsWork, f_, i, i+1, arg, res, iw, w, ind[i], std::ref(ret_values[i]));
     }
 
-    uout() << "Before joins" << std::endl;
     // Join threads
     for (auto && e : threads) e.join();
-    uout() << "After joins" << std::endl;
 
     // Release memory objects
     for (casadi_int i=0; i<n_; ++i) f_.release(ind[i]);
